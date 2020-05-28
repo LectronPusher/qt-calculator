@@ -18,12 +18,12 @@ class Calculator : public QWidget {
 	const int EXP_PRECISION = 3;
 	
 	// valid event chars for determining type in undo
-	const QString VALID_DIGIT = "0123456789.";
-	const QString VALID_SCIEN = "e";
-	const QString VALID_BINARY = "+-xd^lm";
-	const QString VALID_UNARY = "ri!";
-	const QString VALID_SIGN = "s";
-	const QString VALID_MEM = "MW";
+	const std::string VALID_DIGIT = "0123456789.";
+	const std::string VALID_SCIEN = "e";
+	const std::string VALID_BINARY = "+-xd^lm";
+	const std::string VALID_UNARY = "ri!";
+	const std::string VALID_SIGN = "s";
+	const std::string VALID_MEM = "MW";
 	
 	// maps binary event chars to their visual string representation
 	// required for calling on_binary with undo
@@ -135,7 +135,9 @@ private:
 	// returns input_char if it is not '\0', if so, casts button to 
 	// Calcbutton and returns the event_char
 	char event_char_from_button(QObject *button, char input_char);
-	// does debugging by printing events, flags, and mem values
-	void print_events();
+	// prints recent events, current displays, flags, and mem values
+	void print_recent_events();
+	// does debugging by printing all past events and old mem and unary values
+	void print_all_events();
 	
 };

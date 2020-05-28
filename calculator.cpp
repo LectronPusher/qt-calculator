@@ -9,11 +9,14 @@
 #include <cmath>
 
 #include <QTextStream>
+// for debugging
 static QTextStream out(stdout);
 
 //----------------------------constructor----------------------------
 
 Calculator::Calculator(QWidget *parent) : QWidget(parent) {
+	out.setRealNumberPrecision(MAX_PRECISION);
+	
 	// necessary for on_binary functionality
 	binary_strings.insert('+', "+");
 	binary_strings.insert('-', "−");
@@ -22,8 +25,6 @@ Calculator::Calculator(QWidget *parent) : QWidget(parent) {
 	binary_strings.insert('^', "^");
 	binary_strings.insert('l', "log");
 	binary_strings.insert('m', "mod");
-	
-	out.setRealNumberPrecision(MAX_PRECISION);
 	
 	//-------------------label widgets-------------------
 	
@@ -139,7 +140,6 @@ Calculator::Calculator(QWidget *parent) : QWidget(parent) {
 
 void Calculator::on_digit(char digit) {
 	digit = event_char_from_button(sender(), digit);
-	// get the active str, modify it, then set it later
 	QString active_str = active_display->text();
 	// digit should definitely be defined for overwrites
 	if (overwrite_on_input) {
@@ -152,28 +152,23 @@ void Calculator::on_digit(char digit) {
 		return;
 	else if (num_sig_figs(active_str) >= MAX_PRECISION)
 		return;
-	// ignore input for these states
-	switch (digit) {
-		case '0':
-			if ((active_str.startsWith("0") && !active_str.contains(".")) || 
-				(active_str.startsWith("-0") && !active_str.contains(".")) || 
-				active_str.endsWith("e+") || 
-				active_str.endsWith("e-"))
-				return;
-			break;
-		case '.':
-			if (active_str.contains(".") || 
-				active_str.contains("e"))
-				return;
-			break;
+	// ignore input for bad states
+	if (digit == '0' && (
+		(active_str.startsWith("0") && !active_str.contains(".")) || 
+		(active_str.startsWith("-0") && !active_str.contains(".")) || 
+		active_str.endsWith("e+") || 
+		active_str.endsWith("e-"))) {
+		return;
+	} else if (digit == '.' && (
+		active_str.contains(".") || 
+		active_str.contains("e"))) {
+		return;
 	}
-	// update active display and event list
 	active_display->setText(active_str + digit);
 	add_event(digit);
 }
 
 void Calculator::on_scientific(char scien) {
-	// get the active str, modify it, then set it later
 	QString active_str = active_display->text();
 	// ignore input for bad states
 	if (active_has_error)
@@ -182,23 +177,22 @@ void Calculator::on_scientific(char scien) {
 		active_str.contains("e") || 
 		active_str == "-" || 
 		active_str == "." || 
-		active_str == "-.")
+		active_str == "-.") {
 		return;
-	// update active display and event list
+	}
+	// scientific has a unique overwrite reaction
+	// it allows a number to append a new exponent even if it was calculated
+	overwrite_on_input = false;
 	active_display->setText(active_str + "e+");
 	add_event(event_char_from_button(sender(), scien));
-	// scientific has a unique overwrite reaction
-	// it allows a number to have its exponent be modified
-	overwrite_on_input = false;
 }
 
 void Calculator::on_sign(char sign) {
-	// get the active str, modify it, then set it later
 	QString active_str = active_display->text();
 	// ignore input for bad states
 	if (active_has_error) 
 		return;
-	// the big if else statement that controls the galaxy
+	
 	if (active_str.contains("e+"))
 		active_str.replace("e+", "e-");
 	else if (active_str.contains("e-"))
@@ -207,7 +201,7 @@ void Calculator::on_sign(char sign) {
 		active_str.remove(0, 1);
 	else
 		active_str.prepend("-");
-	// update active display and event list
+	
 	active_display->setText(active_str);
 	add_event(event_char_from_button(sender(), sign));
 }
@@ -219,67 +213,63 @@ void Calculator::on_binary(char binary_op) {
 		return;
 	if (upper_display->text().isEmpty())
 		return;
-	// update the display and other variables
+	
 	active_display = lower_display;
-	binary_display->setText(binary_strings[binary_op]);
 	cur_binary_op = binary_op;
+	binary_display->setText(binary_strings[binary_op]);
 	add_event(binary_op);
 }
 
 void Calculator::on_memory(char mem) {
 	mem = event_char_from_button(sender(), mem);
-	// get the active str, modify it, then set it later
 	QString active_str = active_display->text();
-	// change the corresponding memory string
 	QString &mem_str = (mem == 'M') ? memory1 : memory2;
 	// ignore input for bad states
 	if (active_has_error)
 		return;
-	// bad states passed, do logic
-	if (!active_str.isEmpty())
+	
+	if (!active_str.isEmpty()) {
 		mem_str = active_str;
-	else if (!mem_str.isEmpty()) {
-		// setting active causes overwrite
+	} else if (!mem_str.isEmpty()) {
+		// setting active should cause overwrite
 		overwrite_on_input = true;
 		active_display->setText(mem_str);
-	} else
+	} else {
 		return;
-	// store old memory values for undo
+	}
 	QStringList &old_mem = (mem == 'M') ? old_mem1_values : old_mem2_values;
 	old_mem.push_back(mem_str);
-	// update memory display and event list
 	update_memory_display();
 	add_event(mem);
 }
 
 void Calculator::on_unary(char unary_op) {
 	unary_op = event_char_from_button(sender(), unary_op);
-	// get the active str, modify it, then set it later
 	QString active_str = active_display->text();
 	// ignore input for bad states
 	if (active_has_error)
 		return;
 	if (active_str.isEmpty())
 		return;
-	// bad states passed, do calculation
+	
 	double value = string_to_double(active_str);
 	if (check_unary_error(unary_op, value))
 		return;
-	// calculate the new value
 	value = calculate_unary(unary_op, value);
 	QString new_value = double_to_string(value);
 	new_value = check_number_error(new_value);
-	// update active display and event list
-	active_display->setText(new_value);
-	add_event(unary_op);
+	
 	// returning a calculated unary value causes overwrite
 	overwrite_on_input = true;
+	active_display->setText(new_value);
+	add_event(unary_op);
 }
 
 
 //-------------------------functional slots--------------------------
 
 void Calculator::on_clear() {
+	overwrite_on_input = false;
 	active_has_error = false;
 	clear_displays();
 }
@@ -288,59 +278,42 @@ void Calculator::on_equals() {
 	QString up_str = upper_display->text();
 	QString lo_str = lower_display->text();
 	bool just_recalculate_upper = lo_str.isEmpty();
-	// ignore certain bad states
+	// ignore input for bad states
 	if (active_has_error)
 		return;
 	if (up_str.isEmpty())
 		return;
 	if (just_recalculate_upper && !binary_display->text().isEmpty())
 		return;
-	// bad states passed
 	
-	double up = string_to_double(up_str);
-	double lo =  (just_recalculate_upper) ? 0 : string_to_double(lo_str);
-	double value;
-	// either do the binary calculation or just recalculate the upper value
+	// doing anything after this point causes overwrite
+	overwrite_on_input = true;
+	// either recalculate the upper value or attempt the binary calculation
+	double up, lo, value;
+	up = string_to_double(up_str);
 	if (just_recalculate_upper) {
 		value = string_to_double(up_str);
 	} else {
+		lo = string_to_double(lo_str);
 		if (check_binary_error(up, lo))
 			return;
 		value = calculate_binary(up, lo);
 	}
 	QString new_value = double_to_string(value);
 	new_value = check_number_error(new_value);
-	// do debug printing
-	out << "events: ";
-	foreach(std::string str, event_list[event_list.size() - 1])
-		out << str.c_str() << " ";
-	out << '\n';
-	out << "upper:  " << up_str << "  " << up << '\n';
-	out << "lower:  " << lo_str << "  " << lo << '\n';
-	out << "dbl: " << value << '\n';
-	out << "str: " << new_value << "\n\n";
-	
 	clear_displays(new_value);
 }
 
 
 //-------------------------display functions-------------------------
 
-void Calculator::set_active_input(const bool set_to_lower) {
-	if (set_to_lower)
-		active_display = lower_display;
-	else
-		active_display = upper_display;
-}
-
 void Calculator::clear_displays(QString new_upper_str) {
-	event_list.push_back({ new_upper_str.toStdString(), "" });
+	print_recent_events();
 	upper_display->setText(new_upper_str);
 	lower_display->setText("");
 	binary_display->setText("");
-	overwrite_on_input = true;
-	// does not alter active_has_error
 	active_display = upper_display;
+	event_list.push_back({ new_upper_str.toStdString(), "" });
 }
 
 void Calculator::update_memory_display() {
@@ -554,7 +527,7 @@ QString Calculator::check_number_error(QString value) {
 //---------------------------undo functions--------------------------
 
 void Calculator::on_undo() {
-	print_events();
+	print_recent_events();
 	// TODO
 }
 
@@ -583,16 +556,28 @@ char Calculator::event_char_from_button(QObject *button, char input_char) {
 	return input_char;
 }
 
-void Calculator::print_events() {
+void Calculator::print_recent_events() {
+	out << "old val: " << event_list.last().first().c_str()
+	<< "\nevents:  " << event_list.last().last().c_str();
+	out << "\ndisplays: "
+	<< "\n\tupper:  " << upper_display->text()
+	<< "\n\tbinary: " << binary_display->text()
+	<< "\n\tlower:  " << lower_display->text();
+	out << "\nflags:  " 
+	<< "\n\toverwrite: " << overwrite_on_input
+	<< "\n\thas_error: " << active_has_error;
+	out << "memory: "
+	<< "\n\t1: " << memory1
+	<< "\n\t2: " << memory2;
+	out << '\n';
+}
+
+void Calculator::print_all_events() {
 	out << "\nevent list:\n";
 	foreach(QList<std::string> list, event_list) {
 		out << "\tval:    " << list.first().c_str() << '\n';
 		out << "\tevents: " << list.last().c_str() << '\n';
 	}
-	out << "\n flags:\n" 
-		<< "\toverwrite_on_input = " << overwrite_on_input << '\n'
-		<< "\tactive_has_error   = " << active_has_error << '\n';
-	
 	out << "\nold mem1 values:\n";
 	foreach(QString str, old_mem1_values) {
 		out << str << ", ";
