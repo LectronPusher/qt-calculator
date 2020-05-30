@@ -9,18 +9,16 @@ class CalcLabel : public QLabel {
 	Q_OBJECT
 	
 public:
-	CalcLabel (const QString &text_in, bool main_display, 
-			   QWidget *parent = 0)
-	: QLabel(parent) {
-		setText(text_in);
+	CalcLabel (bool number_display, QWidget *parent = 0) : QLabel(parent) {
 		setTextFormat(Qt::PlainText);
 		
 		QFont new_font = font();
 		new_font.setPointSize(new_font.pointSize() + 1);
 		setFont(new_font);
 		
-		if (main_display) {
+		if (number_display) {
 			setAlignment(Qt::AlignRight);
+			setTextInteractionFlags(Qt::TextSelectableByMouse);
 			setSizePolicy(QSizePolicy(QSizePolicy::Expanding, 
 									  QSizePolicy::Fixed));
 		}
