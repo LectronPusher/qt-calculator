@@ -1,38 +1,35 @@
 #pragma once
 
 #include <QLabel>
-// #include <QTextStream>
-
-//  static QTextStream out(stdout);
 
 class CalcLabel : public QLabel {
 	Q_OBJECT
 	
 public:
-	CalcLabel (bool number_display, QWidget *parent = 0) : QLabel(parent) {
-		setTextFormat(Qt::PlainText);
-		
+	// change certain layout features and visual aesthetics
+	CalcLabel (bool number_display, QWidget *parent) : QLabel(parent) {
+		// make the font slightly bigger
 		QFont new_font = font();
 		new_font.setPointSize(new_font.pointSize() + 1);
 		setFont(new_font);
+		setFrameStyle(QFrame::StyledPanel | QFrame::Sunken);
 		
 		if (number_display) {
-			setAlignment(Qt::AlignRight);
-			setTextInteractionFlags(Qt::TextSelectableByMouse);
 			setSizePolicy(QSizePolicy(QSizePolicy::Expanding, 
 									  QSizePolicy::Fixed));
+			setAlignment(Qt::AlignRight);
+			setTextInteractionFlags(Qt::TextSelectableByMouse);
 		}
 		else {
-			setAlignment(Qt::AlignCenter);
 			setSizePolicy(QSizePolicy(QSizePolicy::Minimum, 
 									  QSizePolicy::Fixed));
+			setAlignment(Qt::AlignCenter);
 		}
 	}
 	
 	QSize sizeHint() const {
 		QSize size = QLabel::sizeHint();
 		size.rwidth() = 50;
-// 		out << text() <<  " " << size.rwidth() << '\n';
 		return size;
 	}
 };

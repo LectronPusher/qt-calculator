@@ -1,24 +1,25 @@
 #pragma once
 
+#include "calculator.h"
 #include <QPushButton>
 
 class CalcButton : public QPushButton {
 	Q_OBJECT
 	
-public:
+	Calculator *calc;
 	char event_char;
 	
-	// sets text, event_char, size policy, and connects clicked to func_on_click
-	CalcButton(const QString &text_in, const char& event_char_in,
-			   QWidget *parent, const char *func_on_click)
-	: QPushButton(parent), event_char(event_char_in) {
+public:
+	// does setup, allows button to call calc->do_event when clicked
+	CalcButton(const QString &text_in, const char& event, Calculator *parent)
+	: QPushButton(parent), calc(parent), event_char(event) {
 		setText(text_in);
+		connect(this, SIGNAL(clicked()), this, SLOT(send_event_to_calc()));
 		setSizePolicy(QSizePolicy(QSizePolicy::MinimumExpanding,
 								  QSizePolicy::MinimumExpanding));
-		connect(this, SIGNAL(clicked()), parent, func_on_click);
 	}
 	
-	// make it slightly taller and square if not expanding
+	// make the button slightly taller and square if not expanding
 	QSize sizeHint() const {
 		QSize size = QPushButton::sizeHint();
 		size.rheight() += 3;
@@ -26,6 +27,10 @@ public:
 		return size;
 	}
 	
+private slots:
+	void send_event_to_calc() {
+		calc->do_event(event_char, true);
+	}
 };
 
 
