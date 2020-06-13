@@ -16,12 +16,7 @@ static QTextStream out(stdout);
 //----------------------------constructor----------------------------
 
 // initializes variables and displays, adds buttons, sets the layout
-Calculator::Calculator(QWidget *parent) 
-	: QWidget(parent),
-	VALID_BINARY("[+\\-xd^lm]"),
-	VALID_UNARY("[ri!]"),
-	VALID_MEM("[MW]")
-{	
+Calculator::Calculator(QWidget *parent) : QWidget(parent) {	
 	// set keyboard focus
 	setFocusPolicy(Qt::StrongFocus);
 	
@@ -30,20 +25,26 @@ Calculator::Calculator(QWidget *parent)
 	upper_display = new CalcLabel(true, this);
 	lower_display = new CalcLabel(true, this);
 	binary_display = new CalcLabel(false, this);
-	memory_display = new CalcLabel(false, this);
-	memory_display->setFrameStyle(QFrame::NoFrame);
+	clear_displays();
 	
-	// set the displays to their initial states
-	on_clear();
-	update_memory_display();
+	mem1_state = new QRadioButton(this);
+	mem2_state = new QRadioButton(this);
+	mem1_state->setAttribute(Qt::WA_TransparentForMouseEvents);
+	mem2_state->setAttribute(Qt::WA_TransparentForMouseEvents);
+	mem1_state->setFocusPolicy(Qt::NoFocus);
+	mem2_state->setFocusPolicy(Qt::NoFocus);
+	mem1_state->setAutoExclusive(false);
+	mem2_state->setAutoExclusive(false);
 	
 	QGridLayout *displays = new QGridLayout;
-	displays->addWidget(memory_display, 0, 0);
-	displays->addWidget(upper_display, 0, 1);
-	displays->addWidget(binary_display, 1, 0);
-	displays->addWidget(lower_display, 1, 1);
+	displays->addWidget(mem1_state, 0, 0);
+	displays->addWidget(mem2_state, 0, 1);
+	displays->addWidget(upper_display, 0, 2);
+	displays->addWidget(binary_display, 1, 0, 1, 2);
+	displays->addWidget(lower_display, 1, 2);
 	
 	//-----------------------button widgets------------------------
+	
 	QGridLayout *buttons = new QGridLayout;
 	// row 1
 	buttons->addWidget(new CalcButton("M1", 'M', this), 0, 0);
@@ -128,11 +129,7 @@ char Calculator::get_binary_op() {
 
 //-----------------------------do_event------------------------------
 
-// an extremely simple exception class that handles bad states
-// literally just a thing I can throw
-class BadStateError{};
-
-// calls an input function based on event, also sets add_next_event
+// calls an input function based on event, also calls add_event()
 // returns whether the event was recognized by the switch statement
 bool Calculator::do_event(const char event, bool add_this_event) {
 	try {
@@ -186,7 +183,7 @@ bool Calculator::do_event(const char event, bool add_this_event) {
 	return true;
 }
 
-// handles key press events, passes on to QWidget if not recognized
+// sends key presses to do_event(), passes on to QWidget if not recognized
 void Calculator::keyPressEvent(QKeyEvent *event) {
 	// convert from text to char
 	QChar intermediate;
@@ -246,7 +243,7 @@ void Calculator::keyPressEvent(QKeyEvent *event) {
 		QWidget::keyPressEvent(event);
 }
 
-//--------------------------input functions--------------------------
+//--------------------------regular inputs---------------------------
 
 // adds a digit to the active display, also handles decimal points
 // will replace the current display if overwrite is set
@@ -279,13 +276,16 @@ void Calculator::on_digit(const char digit) {
 // initializing the lower display triggers overwrite
 void Calculator::on_binary(const char binary_op) {
 	// maps binary event chars to their visual string representation
-	static const QMap<char, QString> binary_strings = { 
+	static const QMap<char, QString> display_strings = { 
 		{'+', "+"}, {'-', "−"}, {'x', "×"}, {'d', "÷"}, {'^', "^"}, 
 		{'l', "log"}, {'m', "mod"}
 	};
 	if (active_has_error)
 		throw BadStateError();
-	binary_display->setText(binary_strings.value(binary_op));
+	QString display_str = display_strings.value(binary_op);
+	if (display_str == binary_display->text())
+		throw BadStateError();
+	binary_display->setText(display_str);
 	cur_binary_op = binary_op;
 	
 	if (active_display == upper_display) {
@@ -400,16 +400,14 @@ void Calculator::on_equals() {
 		new_value = error_message;
 	}
 	print_state();
-	reset_displays(new_value);
-	event_frames.append({ new_value, "" });
+	clear_displays(new_value);
 }
 
 // clears the display and sets upper_display to "0", triggers overwrite
 void Calculator::on_clear() {
 	print_state();
-	reset_displays();
+	clear_displays();
 	active_has_error = false;
-	event_frames.append({QString("0"), "" });
 }
 
 // returns the calculator to the previous state before the most recent event
@@ -421,23 +419,8 @@ void Calculator::on_undo() {
 			event_frames.pop_back();
 	} else {
 		char last_event = recent_events.back().toLatin1();
+		remove_old_values(last_event);
 		recent_events.chop(1);
-		// update old_value variables
-		switch (last_event) {
-			case 'M':
-				old_mem1_values.pop_back();
-				all_mem_values.pop_back();
-				break;
-			case 'W':
-				old_mem2_values.pop_back();
-				all_mem_values.pop_back();
-				break;
-			case 'r':
-			case 'i':
-			case '!':
-				old_unary_values.pop_back();
-				break;
-		}
 	}
 	reset_state();
 }
@@ -446,7 +429,7 @@ void Calculator::on_undo() {
 
 // clears displays and sets active display to upper
 // triggers overwrite flag, but does not alter active_has_error
-void Calculator::reset_displays(const QString &reset_val) {
+void Calculator::clear_displays(const QString &reset_val) {
 	overwrite_on_input = true;
 	active_display = upper_display;
 	upper_display->setText(reset_val);
@@ -456,16 +439,14 @@ void Calculator::reset_displays(const QString &reset_val) {
 
 // updates the memory display based on stored memory strings
 void Calculator::update_memory_display() {
-	QString memory_status = "   ";
 	if (memory1.isEmpty())
-		memory_status.prepend("◯");
+		mem1_state->setChecked(false);
 	else
-		memory_status.prepend("◉");
+		mem1_state->setChecked(true);
 	if (memory2.isEmpty())
-		memory_status.append("◯");
+		mem2_state->setChecked(false);
 	else
-		memory_status.append("◉");
-	memory_display->setText(memory_status);
+		mem2_state->setChecked(true);
 }
 
 //--------------------------number functions-------------------------
@@ -526,7 +507,7 @@ double Calculator::calculate_binary(const double up, const double lo) {
 // because cmath doesn't have a factorial function
 // only defined to 20!
 long long factorial(int n) {
-	if ( 0 > n || n >= 21)
+	if (n < 0 || n >= 21)
 		return -1;
 	long long fact = 1;
 	for (int i=1; i <= n; ++i)
@@ -632,16 +613,37 @@ void Calculator::add_event(const char event) {
 			break;
 		case 'q':
 		case 'c':
+			event_frames.append({ upper_display->text(), "" });
+			// intentional fallthrough
 		case 'u':
 			return; // don't add functional inputs
 	}
 	event_frames.last().second += event;
 }
 
+// updates the old value variables based on the last event
+void Calculator::remove_old_values(const char last_event) {
+	switch (last_event) {
+		case 'M':
+			old_mem1_values.pop_back();
+			all_mem_values.pop_back();
+			break;
+		case 'W':
+			old_mem2_values.pop_back();
+			all_mem_values.pop_back();
+			break;
+		case 'r':
+		case 'i':
+		case '!':
+			old_unary_values.pop_back();
+			break;
+	}
+}
+
 // sets the state of the calculator to that of the last event frame
 // updates the displays, flags, and memory to reflect the new state
 void Calculator::reset_state() {
-	reset_displays(event_frames.last().first);
+	clear_displays(event_frames.last().first);
 	QString &recent_events = event_frames.last().second;
 	int unary_size = old_unary_values.size();
 	int mem_size = all_mem_values.size();

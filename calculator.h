@@ -3,6 +3,7 @@
 #include "calclabel.h"
 #include <QWidget>
 #include <QRegularExpression>
+#include <QRadioButton>
 #include <QStringList>
 #include <QKeyEvent>
 #include <QList>
@@ -26,42 +27,51 @@ public:
 	QString get_memory2();
 	char get_binary_op();
 	
-	// calls an input function based on event, also sets add_next_event
+	// calls an input function based on event, also calls add_event()
 	// returns whether the event was recognized by the switch statement
 	bool do_event(const char event, bool add_this_event);
 	
 protected:
-	// handles key press events, passes on to QWidget if not recognized
+	// sends key presses to do_event(), passes on to QWidget if not recognized
 	void keyPressEvent(QKeyEvent *event);
 	
 private:
 	//-------------------------------variables-------------------------------
-	// display variables that both store and show information to the user
+	// the number displays that both store and show information to the user
 	CalcLabel *upper_display;
 	CalcLabel *lower_display;
-	CalcLabel *binary_display;
-	CalcLabel *memory_display;
 	// points to upper or lower, whichever is active
 	CalcLabel *active_display;
+	// shows the unicode version of cur_binary_op
+	CalcLabel *binary_display;
+	// the operator to be used by on_equals
+	char cur_binary_op = '\0';
+	// displays whether the memory values are empty
+	QRadioButton *mem1_state;
+	QRadioButton *mem2_state;
 	// the stored memory values
 	QString memory1;
 	QString memory2;
+	
 	// error flags: active_has error implies overwrite
 	// however overwrite doesn't imply active_has_error
 	bool overwrite_on_input = true;
 	bool active_has_error = false;
-	// the operator to be used by on_equals
-	char cur_binary_op = '\0';
 	
 	// precision constants
 	const int MAX_PRECISION = 10;
 	const int EXP_PRECISION = 3;
 	
+	// a unique class I can throw to simplify some logic
+	// the only function that catches it is do_event()
+	// and the only functions that throw it are exclusively called by do_event()
+	class BadStateError{};
+	
 	//----------------------------undo variables-----------------------------
 	// a frame is whenever the displays are cleared and a value is put in upper
 	// first is the value of upper at that frame
 	// second is the event list for that frame
-	QList<QPair<QString, QString>> event_frames;
+	QList<QPair<QString, QString>> event_frames = { {QString("0"), "" } };
 	// I refuse to recalculate old events when undoing
 	// these variables compensate for that limitation
 	QStringList old_unary_values;
@@ -69,11 +79,11 @@ private:
 	QStringList old_mem1_values;
 	QStringList old_mem2_values;
 	// determine binary, unary, and mem locations in undo
-	const QRegularExpression VALID_BINARY;
-	const QRegularExpression VALID_UNARY;
-	const QRegularExpression VALID_MEM;
+	const QRegularExpression VALID_BINARY = QRegularExpression("[+\\-xd^lm]");
+	const QRegularExpression VALID_UNARY = QRegularExpression("[ri!]");
+	const QRegularExpression VALID_MEM = QRegularExpression("[MW]");
 	
-	//----------------------------input functions----------------------------
+	//----------------------------regular inputs-----------------------------
 	// adds a digit to the active display, also handles decimal points
 	// will replace the current display if overwrite is set
 	void on_digit(const char digit);
@@ -94,6 +104,8 @@ private:
 	// swaps the sign of the number or if the number has e, the sign of e
 	// will still swap if overwrite is set
 	void on_sign();
+
+	//---------------------------functional inputs---------------------------
 	// either recalculates the upper display, or does the binary calculation
 	// clears the display and places the value in the upper display
 	// triggers overwrite, can trigger active_has_error
@@ -106,7 +118,7 @@ private:
 	//--------------------------display functions----------------------------
 	// clears displays and sets active display to upper
 	// triggers overwrite flag, but does not alter active_has_error
-	void reset_displays(const QString &reset_val = "0");
+	void clear_displays(const QString &reset_val = "0");
 	// updates the memory display based on stored memory strings
 	void update_memory_display();
 	
@@ -137,6 +149,8 @@ private:
 	// appends the given event to the event list for the current frame
 	// also updates old mem values and old unary values
 	void add_event(const char event);
+	// updates the old value variables based on the last event
+	void remove_old_values(const char last_event);
 	// sets the state of the calculator to that of the last event frame
 	// updates the displays, flags, and memory to reflect the new state
 	void reset_state();

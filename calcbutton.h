@@ -22,7 +22,7 @@ public:
 	// make the button slightly taller and square if not expanding
 	QSize sizeHint() const {
 		QSize size = QPushButton::sizeHint();
-		size.rheight() += 3;
+		size.rheight() += 5;
 		size.rwidth() = size.rheight();
 		return size;
 	}

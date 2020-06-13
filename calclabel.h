@@ -3,8 +3,6 @@
 #include <QLabel>
 
 class CalcLabel : public QLabel {
-	Q_OBJECT
-	
 public:
 	// change certain layout features and visual aesthetics
 	CalcLabel (bool number_display, QWidget *parent) : QLabel(parent) {
